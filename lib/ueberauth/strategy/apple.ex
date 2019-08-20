@@ -34,18 +34,35 @@ defmodule Ueberauth.Strategy.Apple do
     params = [code: code]
     opts = oauth_client_options_from_conn(conn)
 
-    case Ueberauth.Strategy.Apple.OAuth.get_access_token(params, opts) do
-      {:ok, token} ->
-        user =
-          %{}
-          |> Map.put("uid", UeberauthApple.uid_from_id_token(token.other_params["id_token"]))
-
-        conn
-        |> put_private(:apple_token, token)
-        |> put_private(:apple_user, user)
-
+    with {:ok, token} <- Ueberauth.Strategy.Apple.OAuth.get_access_token(params, opts),
+      {:ok, user} <- user_from_id_token(token.other_params["id_token"]) do
+      conn
+      |> put_private(:apple_token, token)
+      |> put_private(:apple_user, user)
+    else
       {:error, {error_code, error_description}} ->
         set_errors!(conn, [error(error_code, error_description)])
+      {:error, error} ->
+        set_errors!(conn, [error(:auth_failed, error)])
+      _ ->
+        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token")])
+    end
+  end
+
+  @doc """
+  Handles the callback from app.
+  """
+  def handle_callback!(%Plug.Conn{params: %{"id_token" => id_token, "name" => name}} = conn) do
+    case user_from_id_token(id_token) do
+      {:ok, user} ->
+        user = normalize_user_name(user, name)
+        conn
+        |> put_private(:apple_user, user)
+        |> put_private(:apple_token, OAuth2.AccessToken.new(id_token))
+      {:error, error} ->
+        set_errors!(conn, [error(:auth_failed, error)])
+      error ->
+        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token")])
     end
   end
 
@@ -102,9 +119,9 @@ defmodule Ueberauth.Strategy.Apple do
   def info(conn) do
     user = conn.private.apple_user
     name = user["name"]
-
     %Info{
       email: user["email"],
+      name: name && name["name"],
       first_name: name && name["firstName"],
       last_name: name && name["lastName"]
     }
@@ -143,5 +160,37 @@ defmodule Ueberauth.Strategy.Apple do
 
   defp option(conn, key) do
     Keyword.get(options(conn), key, Keyword.get(default_options(), key))
+  end
+
+  defp user_from_id_token(id_token) do
+    with {:ok, fields} <- UeberauthApple.fields_from_id_token(id_token) do
+      user =
+        Map.new
+        |> Map.put("uid", fields["sub"])
+        |> Map.put("email", fields["email"])
+        |> Map.put("name", fields["name"])
+        |> Map.put("email_verified", fields["email_verified"])
+      {:ok, user}
+    end
+  end
+
+  # it seems id_token doesn't include the name
+  # even if we specify the scope
+  defp normalize_user_name(user, name) do
+    user_name = user["name"] || name
+    case String.split(user_name) do
+      [firstName, lastName] ->
+        user |> Map.put("name", %{
+          "name" => user_name,
+          "firstName" => firstName,
+          "lastName" => lastName
+        })
+      [firstName] ->
+        user |> Map.put("name", %{
+          "name" => user_name,
+          "firstName" => firstName,
+          "lastName" => nil
+        })
+    end
   end
 end
