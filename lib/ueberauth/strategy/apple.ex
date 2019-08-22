@@ -177,7 +177,7 @@ defmodule Ueberauth.Strategy.Apple do
   # it seems id_token doesn't include the name
   # even if we specify the scope
   defp normalize_user_name(user, name) do
-    user_name = user["name"] || name
+    user_name = user["name"] || name || ""
     case String.split(user_name) do
       [firstName, lastName] ->
         user |> Map.put("name", %{
@@ -191,6 +191,8 @@ defmodule Ueberauth.Strategy.Apple do
           "firstName" => firstName,
           "lastName" => nil
         })
+      _ ->
+        user
     end
   end
 end
