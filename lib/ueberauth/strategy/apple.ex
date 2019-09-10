@@ -9,6 +9,8 @@ defmodule Ueberauth.Strategy.Apple do
   alias Ueberauth.Auth.Credentials
   alias Ueberauth.Auth.Extra
 
+  @allowed_client_ids Application.get_env(:ueberauth, Ueberauth.Strategy.Apple.OAuth)[:allowed_client_ids]
+
   @doc """
   Handles initial request for Apple authentication.
   """
@@ -164,13 +166,17 @@ defmodule Ueberauth.Strategy.Apple do
 
   defp user_from_id_token(id_token) do
     with {:ok, fields} <- UeberauthApple.fields_from_id_token(id_token) do
-      user =
-        Map.new
-        |> Map.put("uid", fields["sub"])
-        |> Map.put("email", fields["email"])
-        |> Map.put("name", fields["name"])
-        |> Map.put("email_verified", fields["email_verified"])
-      {:ok, user}
+      if Enum.member?(@allowed_client_ids, fields["aud"]) do
+        user =
+          Map.new
+          |> Map.put("uid", fields["sub"])
+          |> Map.put("email", fields["email"])
+          |> Map.put("name", fields["name"])
+          |> Map.put("email_verified", fields["email_verified"])
+        {:ok, user}
+      else
+        {:error, "Unknown client id #{fields["aud"]}"}
+      end
     end
   end
 
