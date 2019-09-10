@@ -166,7 +166,7 @@ defmodule Ueberauth.Strategy.Apple do
 
   defp user_from_id_token(id_token) do
     with {:ok, fields} <- UeberauthApple.fields_from_id_token(id_token) do
-      if Enum.member?(@allowed_client_ids, fields["aud"]) do
+      if Enum.empty?(@allowed_client_ids) || Enum.member?(@allowed_client_ids, fields["aud"]) do
         user =
           Map.new
           |> Map.put("uid", fields["sub"])
