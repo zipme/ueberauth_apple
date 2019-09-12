@@ -1,6 +1,6 @@
 defmodule Ueberauth.Strategy.Apple do
   @moduledoc """
-  Google Strategy for Überauth.
+  Apple Strategy for Überauth.
   """
 
   use Ueberauth.Strategy, uid_field: :uid, default_scope: "name email"
@@ -9,7 +9,10 @@ defmodule Ueberauth.Strategy.Apple do
   alias Ueberauth.Auth.Credentials
   alias Ueberauth.Auth.Extra
 
-  @allowed_client_ids Application.get_env(:ueberauth, Ueberauth.Strategy.Apple.OAuth)[:allowed_client_ids]
+  @allowed_client_ids Application.get_env(
+    :ueberauth,
+    Ueberauth.Strategy.Apple.OAuth
+  )[:allowed_client_ids]
 
   @doc """
   Handles initial request for Apple authentication.
@@ -37,15 +40,17 @@ defmodule Ueberauth.Strategy.Apple do
     opts = oauth_client_options_from_conn(conn)
 
     with {:ok, token} <- Ueberauth.Strategy.Apple.OAuth.get_access_token(params, opts),
-      {:ok, user} <- user_from_id_token(token.other_params["id_token"]) do
+         {:ok, user} <- user_from_id_token(token.other_params["id_token"]) do
       conn
       |> put_private(:apple_token, token)
       |> put_private(:apple_user, user)
     else
       {:error, {error_code, error_description}} ->
         set_errors!(conn, [error(error_code, error_description)])
+
       {:error, error} ->
         set_errors!(conn, [error(:auth_failed, error)])
+
       _ ->
         set_errors!(conn, [error(:auth_failed, "failed to retrieve access token")])
     end
@@ -58,11 +63,14 @@ defmodule Ueberauth.Strategy.Apple do
     case user_from_id_token(id_token) do
       {:ok, user} ->
         user = normalize_user_name(user, name)
+
         conn
         |> put_private(:apple_user, user)
         |> put_private(:apple_token, OAuth2.AccessToken.new(id_token))
+
       {:error, error} ->
         set_errors!(conn, [error(:auth_failed, error)])
+
       error ->
         set_errors!(conn, [error(:auth_failed, "failed to retrieve access token")])
     end
@@ -121,6 +129,7 @@ defmodule Ueberauth.Strategy.Apple do
   def info(conn) do
     user = conn.private.apple_user
     name = user["name"]
+
     %Info{
       email: user["email"],
       name: name && name["name"],
@@ -130,7 +139,7 @@ defmodule Ueberauth.Strategy.Apple do
   end
 
   @doc """
-  Stores the raw information (including the token) obtained from the google callback.
+  Stores the raw information (including the token) obtained from the apple callback.
   """
   def extra(conn) do
     %Extra{
@@ -166,16 +175,18 @@ defmodule Ueberauth.Strategy.Apple do
 
   defp user_from_id_token(id_token) do
     with {:ok, fields} <- UeberauthApple.fields_from_id_token(id_token) do
+
       if Enum.empty?(@allowed_client_ids) || Enum.member?(@allowed_client_ids, fields["aud"]) do
         user =
-          Map.new
+          Map.new()
           |> Map.put("uid", fields["sub"])
           |> Map.put("email", fields["email"])
           |> Map.put("name", fields["name"])
           |> Map.put("email_verified", fields["email_verified"])
+
         {:ok, user}
       else
-        {:error, "Unknown client id #{fields["aud"]}"}
+        {:error, "Unknown client id #{fields["aud"]}, allowed client ids are #{inspect @allowed_client_ids}"}
       end
     end
   end
@@ -184,19 +195,24 @@ defmodule Ueberauth.Strategy.Apple do
   # even if we specify the scope
   defp normalize_user_name(user, name) do
     user_name = user["name"] || name || ""
+
     case String.split(user_name) do
       [firstName, lastName] ->
-        user |> Map.put("name", %{
+        user
+        |> Map.put("name", %{
           "name" => user_name,
           "firstName" => firstName,
           "lastName" => lastName
         })
+
       [firstName] ->
-        user |> Map.put("name", %{
+        user
+        |> Map.put("name", %{
           "name" => user_name,
           "firstName" => firstName,
           "lastName" => nil
         })
+
       _ ->
         user
     end
