@@ -10,9 +10,9 @@ defmodule Ueberauth.Strategy.Apple do
   alias Ueberauth.Auth.Extra
 
   @allowed_client_ids Application.get_env(
-    :ueberauth,
-    Ueberauth.Strategy.Apple.OAuth
-  )[:allowed_client_ids]
+                        :ueberauth,
+                        Ueberauth.Strategy.Apple.OAuth
+                      )[:allowed_client_ids]
 
   @doc """
   Handles initial request for Apple authentication.
@@ -175,8 +175,14 @@ defmodule Ueberauth.Strategy.Apple do
 
   defp user_from_id_token(id_token) do
     with {:ok, fields} <- UeberauthApple.fields_from_id_token(id_token) do
+      allowed_client_ids =
+        if is_binary(@allowed_client_ids),
+          do: String.split(@allowed_client_ids, ","),
+          else: @allowed_client_ids
 
-      if Enum.empty?(@allowed_client_ids) || Enum.member?(@allowed_client_ids, fields["aud"]) do
+      IO.inspect @allowed_client_ids
+
+      if Enum.empty?(allowed_client_ids) || Enum.member?(allowed_client_ids, fields["aud"]) do
         user =
           Map.new()
           |> Map.put("uid", fields["sub"])
@@ -186,7 +192,10 @@ defmodule Ueberauth.Strategy.Apple do
 
         {:ok, user}
       else
-        {:error, "Unknown client id #{fields["aud"]}, allowed client ids are #{inspect @allowed_client_ids}"}
+        {:error,
+         "Unknown client id #{fields["aud"]}, allowed client ids are #{
+           inspect(allowed_client_ids)
+         }"}
       end
     end
   end
