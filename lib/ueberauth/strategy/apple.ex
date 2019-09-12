@@ -178,9 +178,7 @@ defmodule Ueberauth.Strategy.Apple do
       allowed_client_ids =
         if is_binary(@allowed_client_ids),
           do: String.split(@allowed_client_ids, ","),
-          else: @allowed_client_ids
-
-      IO.inspect @allowed_client_ids
+          else: @allowed_client_ids || []
 
       if Enum.empty?(allowed_client_ids) || Enum.member?(allowed_client_ids, fields["aud"]) do
         user =
