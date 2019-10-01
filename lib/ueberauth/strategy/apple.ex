@@ -58,7 +58,45 @@ defmodule Ueberauth.Strategy.Apple do
 
   @doc """
   Handles the callback from app.
+
+  `initial_id_token` is the token that the user
+  signed in successfully the first which should
+  contain user status such as email.
+
+  See https://stackoverflow.com/questions/57545635/cannot-get-name-email-with-sign-in-with-apple-on-real-device
   """
+  def handle_callback!(
+        %Plug.Conn{
+          params: %{
+            "id_token" => id_token,
+            "initial_id_token" => initial_id_token,
+            "name" => name
+          }
+        } = conn
+      ) do
+    with {:ok, initial_user} <- user_from_id_token(initial_id_token),
+         {:ok, user} <- user_from_id_token(id_token),
+         true <- initial_user["uid"] == user["uid"] do
+      user =
+        user
+        |> Map.put("email", initial_user["email"])
+        |> Map.put("name", initial_user["name"])
+        |> Map.put("email_verified", initial_user["email_verified"])
+        |> normalize_user_name(name)
+
+      IO.puts "login with user, email = #{user["email"]}"
+
+      conn
+        |> put_private(:apple_user, user)
+        |> put_private(:apple_token, OAuth2.AccessToken.new(id_token))
+    else
+      {:error, error} ->
+        set_errors!(conn, [error(:auth_failed, error)])
+      error ->
+        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token")])
+    end
+  end
+
   def handle_callback!(%Plug.Conn{params: %{"id_token" => id_token, "name" => name}} = conn) do
     case user_from_id_token(id_token) do
       {:ok, user} ->
