@@ -21,12 +21,13 @@ defmodule Ueberauth.Strategy.Apple do
     scopes = conn.params["scope"] || option(conn, :default_scope)
 
     params =
-      [scope: scopes]
+      [scope: scopes, response_mode: "form_post"]
       |> with_optional(:prompt, conn)
       |> with_optional(:access_type, conn)
       |> with_param(:access_type, conn)
       |> with_param(:prompt, conn)
       |> with_param(:state, conn)
+      |> with_param(:response_mode, conn)
 
     opts = oauth_client_options_from_conn(conn)
     redirect!(conn, Ueberauth.Strategy.Apple.OAuth.authorize_url!(params, opts))
@@ -83,8 +84,6 @@ defmodule Ueberauth.Strategy.Apple do
         |> Map.put("name", initial_user["name"])
         |> Map.put("email_verified", initial_user["email_verified"])
         |> normalize_user_name(name)
-
-      IO.puts "login with user, email = #{user["email"]}"
 
       conn
         |> put_private(:apple_user, user)
