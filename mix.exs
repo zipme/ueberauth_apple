@@ -22,18 +22,15 @@ defmodule UeberauthApple.Mixfile do
   end
 
   def application do
-    [applications: [:logger, :oauth2, :ueberauth]]
+    [applications: [:logger, :oauth2, :ueberauth, :jose]]
   end
 
   defp deps do
     [
-      {:oauth2, ">= 0.0.0"},
-      {:ueberauth, "~> 0.5"},
+      {:oauth2, ">= 0.8.0"},
+      {:ueberauth, "~> 0.4"},
       {:jose, "~> 1.0"},
-      {:httpoison, "~> 1.0"},
-      {:credo, "~> 0.8", only: [:dev, :test]},
-      {:earmark, ">= 0.0.0", only: :dev},
-      {:ex_doc, "~> 0.3", only: :dev}
+      {:httpoison, "~> 0.7"}
     ]
   end
 

@@ -1,15 +1,20 @@
 defmodule UeberauthApple do
   @default_expires_in 86400 * 180
   @public_key_url "https://appleid.apple.com/auth/keys"
+  @alg "RS256"
 
   def fields_from_id_token(id_token) do
     with {:ok, %{body: response_body}} <- HTTPoison.get(@public_key_url),
-         {true, %JOSE.JWT{fields: fields}, jws} <-
+         {true, %JOSE.JWT{fields: fields}, _jws} <-
            Ueberauth.json_library().decode!(response_body)["keys"]
            |> List.first()
            |> JOSE.JWT.verify(id_token) do
       {:ok, fields}
     end
+  end
+
+  def verify_token(key, token) do
+    JsonWebToken.verify(token, alg: @alg, key: key)
   end
 
   @doc """

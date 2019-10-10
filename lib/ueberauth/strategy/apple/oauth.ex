@@ -28,6 +28,8 @@ defmodule Ueberauth.Strategy.Apple.OAuth do
     config = Application.get_env(:ueberauth, __MODULE__, [])
     opts = @defaults |> Keyword.merge(opts) |> Keyword.merge(config) |> resolve_values()
     OAuth2.Client.new(opts)
+    |> put_serializer("application/json;charset=ISO-8859-1", Jason)
+    |> put_serializer("application/json", Jason)
   end
 
   @doc """
