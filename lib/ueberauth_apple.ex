@@ -4,12 +4,15 @@ defmodule UeberauthApple do
   @alg "RS256"
 
   def fields_from_id_token(id_token) do
-    with {:ok, %{body: response_body}} <- HTTPoison.get(@public_key_url),
+    with %{fields: %{"kid" => kid}} <- JOSE.JWT.peek_protected(id_token),
+      {:ok, %{body: response_body}} <- HTTPoison.get(@public_key_url),
          {true, %JOSE.JWT{fields: fields}, _jws} <-
            Ueberauth.json_library().decode!(response_body)["keys"]
-           |> List.first()
-           |> JOSE.JWT.verify(id_token) do
+           |> find_key(kid)
+           |> JOSE.JWT.verify(id_token)do
       {:ok, fields}
+    else
+      reason -> {:error, inspect(reason)}
     end
   end
 
@@ -43,4 +46,8 @@ defmodule UeberauthApple do
 
   def generate_client_secret(opts) when is_list(opts),
     do: opts |> Enum.into(%{}) |> generate_client_secret()
+
+  defp find_key(keys, kid) do
+    Enum.find(keys, &(&1["kid"] == kid))
+  end
 end
