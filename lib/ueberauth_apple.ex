@@ -3,16 +3,23 @@ defmodule UeberauthApple do
   @public_key_url "https://appleid.apple.com/auth/keys"
   @alg "RS256"
 
-  def fields_from_id_token(id_token) do
+  def fields_from_id_token(id_token, verify \\ true)
+  def fields_from_id_token(id_token, false) do
+    %JOSE.JWT{fields: fields} = JOSE.JWT.peek_payload(id_token)
+    {:ok, fields}
+  end
+  def fields_from_id_token(id_token, true) do
     with %{fields: %{"kid" => kid}} <- JOSE.JWT.peek_protected(id_token),
-      {:ok, %{body: response_body}} <- HTTPoison.get(@public_key_url),
-         {true, %JOSE.JWT{fields: fields}, _jws} <-
+         {:ok, %{body: response_body}} <- HTTPoison.get(@public_key_url),
+         {:ok, key} <-
            Ueberauth.json_library().decode!(response_body)["keys"]
-           |> find_key(kid)
-           |> JOSE.JWT.verify(id_token)do
+           |> find_key(kid),
+         {true, %JOSE.JWT{fields: fields}, _jws} <-
+           JOSE.JWT.verify(key, id_token) do
       {:ok, fields}
     else
-      reason -> {:error, inspect(reason)}
+      reason ->
+        {:error, inspect(reason)}
     end
   end
 
@@ -48,6 +55,9 @@ defmodule UeberauthApple do
     do: opts |> Enum.into(%{}) |> generate_client_secret()
 
   defp find_key(keys, kid) do
-    Enum.find(keys, &(&1["kid"] == kid))
+    case Enum.find(keys, &(&1["kid"] == kid)) do
+      nil -> {:error, :key_not_found}
+      key -> {:ok, key}
+    end
   end
 end

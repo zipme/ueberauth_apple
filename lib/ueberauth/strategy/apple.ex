@@ -52,8 +52,8 @@ defmodule Ueberauth.Strategy.Apple do
       {:error, error} ->
         set_errors!(conn, [error(:auth_failed, error)])
 
-      _ ->
-        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token")])
+      error ->
+        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token #{inspect(error)}")])
     end
   end
 
@@ -75,7 +75,7 @@ defmodule Ueberauth.Strategy.Apple do
           }
         } = conn
       ) do
-    with {:ok, initial_user} <- user_from_id_token(initial_id_token),
+    with {:ok, initial_user} <- user_from_id_token(initial_id_token, false),
          {:ok, user} <- user_from_id_token(id_token),
          true <- initial_user["uid"] == user["uid"] do
       user =
@@ -86,13 +86,14 @@ defmodule Ueberauth.Strategy.Apple do
         |> normalize_user_name(name)
 
       conn
-        |> put_private(:apple_user, user)
-        |> put_private(:apple_token, OAuth2.AccessToken.new(id_token))
+      |> put_private(:apple_user, user)
+      |> put_private(:apple_token, OAuth2.AccessToken.new(id_token))
     else
       {:error, error} ->
         set_errors!(conn, [error(:auth_failed, error)])
+
       error ->
-        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token")])
+        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token #{inspect(error)}")])
     end
   end
 
@@ -109,7 +110,7 @@ defmodule Ueberauth.Strategy.Apple do
         set_errors!(conn, [error(:auth_failed, error)])
 
       error ->
-        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token")])
+        set_errors!(conn, [error(:auth_failed, "failed to retrieve access token #{inspect(error)}")])
     end
   end
 
@@ -210,8 +211,8 @@ defmodule Ueberauth.Strategy.Apple do
     Keyword.get(options(conn), key, Keyword.get(default_options(), key))
   end
 
-  defp user_from_id_token(id_token) do
-    with {:ok, fields} <- UeberauthApple.fields_from_id_token(id_token) do
+  defp user_from_id_token(id_token, verify \\ true) do
+    with {:ok, fields} <- UeberauthApple.fields_from_id_token(id_token, verify) do
       allowed_client_ids =
         if is_binary(@allowed_client_ids),
           do: String.split(@allowed_client_ids, ","),
