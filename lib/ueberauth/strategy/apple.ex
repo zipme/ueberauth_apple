@@ -21,7 +21,7 @@ defmodule Ueberauth.Strategy.Apple do
     scopes = conn.params["scope"] || option(conn, :default_scope)
 
     params =
-      [scope: scopes, response_mode: "form_post"]
+      [scope: scopes, response_mode: "form_post", response_type: "code id_token"]
       |> with_optional(:prompt, conn)
       |> with_optional(:access_type, conn)
       |> with_param(:access_type, conn)
